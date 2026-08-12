@@ -1,15 +1,17 @@
 package nino.gravekeeper.manager;
 
+import net.kyori.adventure.text.Component;
 import nino.gravekeeper.model.GraveData;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.Chest;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
-import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -84,63 +86,83 @@ public final class GraveManager {
         return result;
     }
 
+    public Location locationOf(GraveData grave) {
+        World world = Bukkit.getWorld(grave.worldName());
+        if (world == null) {
+            return null;
+        }
+        return new Location(world, grave.x(), grave.y(), grave.z());
+    }
+
     public GraveData createGrave(UUID ownerId, String ownerName, Location deathLocation,
                                   List<ItemStack> items, int experienceLevel) {
         long now = System.currentTimeMillis();
         long lifetimeSeconds = plugin.getConfig().getLong("grave-lifetime-seconds", 300L);
         UUID graveId = UUID.randomUUID();
+        Location blockLocation = deathLocation.getBlock().getLocation();
         GraveData grave = new GraveData(graveId, ownerId, ownerName,
-                deathLocation.getWorld().getName(), deathLocation.getX(), deathLocation.getY(),
-                deathLocation.getZ(), items, experienceLevel, now, now + lifetimeSeconds * 1000L);
+                blockLocation.getWorld().getName(), blockLocation.getX(), blockLocation.getY(),
+                blockLocation.getZ(), experienceLevel, now, now + lifetimeSeconds * 1000L);
         register(grave);
         storage.save(grave);
-        spawnMarker(grave);
+        spawnGrave(grave, items);
         scheduleExpiry(grave, lifetimeSeconds * 20L);
         return grave;
     }
 
-    public void spawnMarker(GraveData grave) {
-        World world = Bukkit.getWorld(grave.worldName());
-        if (world == null) {
+    public void spawnGrave(GraveData grave, List<ItemStack> items) {
+        Location location = locationOf(grave);
+        if (location == null) {
             return;
         }
-        Location location = new Location(world, grave.x(), grave.y(), grave.z());
+        World world = location.getWorld();
         Bukkit.getServer().getRegionScheduler().execute(plugin, location, () -> {
-            if (findMarker(grave.graveId()) != null) {
-                return;
+            Block block = location.getBlock();
+            block.setType(Material.CHEST, false);
+            if (block.getState() instanceof Chest chest) {
+                chest.getPersistentDataContainer().set(graveIdKey, PersistentDataType.STRING, grave.graveId().toString());
+                chest.getPersistentDataContainer().set(ownerIdKey, PersistentDataType.STRING, grave.ownerId().toString());
+                chest.update(true);
+                for (ItemStack item : items) {
+                    if (item == null) {
+                        continue;
+                    }
+                    Map<Integer, ItemStack> leftover = chest.getBlockInventory().addItem(item);
+                    for (ItemStack overflow : leftover.values()) {
+                        block.getWorld().dropItemNaturally(location, overflow);
+                    }
+                }
             }
-            ArmorStand armorStand = (ArmorStand) world.spawnEntity(location, EntityType.ARMOR_STAND);
-            armorStand.setInvisible(true);
-            armorStand.setGravity(false);
-            armorStand.setBasePlate(false);
-            armorStand.setSmall(true);
-            armorStand.setCustomNameVisible(true);
-            armorStand.customName(net.kyori.adventure.text.Component.text(grave.ownerName() + "'s Grave"));
-            String materialName = plugin.getConfig().getString("marker-material", "PLAYER_HEAD");
-            Material material = Material.matchMaterial(materialName);
-            if (material == null) {
-                material = Material.PLAYER_HEAD;
-            }
-            EntityEquipment equipment = armorStand.getEquipment();
-            if (equipment != null) {
-                equipment.setHelmet(new ItemStack(material));
-            }
-            armorStand.getPersistentDataContainer().set(graveIdKey, PersistentDataType.STRING, grave.graveId().toString());
-            armorStand.getPersistentDataContainer().set(ownerIdKey, PersistentDataType.STRING, grave.ownerId().toString());
+            spawnLabel(grave, world, location);
         });
     }
 
-    private ArmorStand findMarker(UUID graveId) {
+    private void spawnLabel(GraveData grave, World world, Location chestLocation) {
+        if (findLabel(grave.graveId()) != null) {
+            return;
+        }
+        Location labelLocation = chestLocation.clone().add(0.5, 1.1, 0.5);
+        ArmorStand label = (ArmorStand) world.spawnEntity(labelLocation, EntityType.ARMOR_STAND);
+        label.setInvisible(true);
+        label.setGravity(false);
+        label.setMarker(true);
+        label.setSmall(true);
+        label.setCustomNameVisible(true);
+        label.customName(Component.text(grave.ownerName() + "'s Grave"));
+        label.getPersistentDataContainer().set(graveIdKey, PersistentDataType.STRING, grave.graveId().toString());
+        label.getPersistentDataContainer().set(ownerIdKey, PersistentDataType.STRING, grave.ownerId().toString());
+    }
+
+    private ArmorStand findLabel(UUID graveId) {
         GraveData grave = graves.get(graveId);
         if (grave == null) {
             return null;
         }
-        World world = Bukkit.getWorld(grave.worldName());
-        if (world == null) {
+        Location location = locationOf(grave);
+        if (location == null) {
             return null;
         }
-        Location location = new Location(world, grave.x(), grave.y(), grave.z());
-        for (Entity entity : world.getNearbyEntities(location, 2, 2, 2)) {
+        for (Entity entity : location.getWorld().getNearbyEntities(location, 2, 2, 2)) {
             if (entity instanceof ArmorStand armorStand) {
                 String storedId = armorStand.getPersistentDataContainer().get(graveIdKey, PersistentDataType.STRING);
                 if (storedId != null && storedId.equals(graveId.toString())) {
@@ -152,11 +174,10 @@ public final class GraveManager {
     }
 
     public void scheduleExpiry(GraveData grave, long delayTicks) {
-        World world = Bukkit.getWorld(grave.worldName());
-        if (world == null) {
+        Location location = locationOf(grave);
+        if (location == null) {
             return;
         }
-        Location location = new Location(world, grave.x(), grave.y(), grave.z());
         Bukkit.getServer().getRegionScheduler().runDelayed(plugin, location,
                 task -> expireGrave(grave.graveId()), Math.max(1, delayTicks));
     }
@@ -166,59 +187,59 @@ public final class GraveManager {
         if (grave == null) {
             return;
         }
-        World world = Bukkit.getWorld(grave.worldName());
-        if (world == null) {
+        Location location = locationOf(grave);
+        if (location == null) {
             unregister(grave);
             storage.delete(graveId);
             return;
         }
-        Location location = new Location(world, grave.x(), grave.y(), grave.z());
         Bukkit.getServer().getRegionScheduler().execute(plugin, location, () -> {
             String onExpire = plugin.getConfig().getString("on-expire", "DROP");
-            if ("DROP".equalsIgnoreCase(onExpire)) {
-                for (ItemStack item : grave.items()) {
+            Block block = location.getBlock();
+            if ("DROP".equalsIgnoreCase(onExpire) && block.getState() instanceof Chest chest) {
+                for (ItemStack item : chest.getBlockInventory().getContents()) {
                     if (item != null) {
-                        world.dropItemNaturally(location, item);
+                        block.getWorld().dropItemNaturally(location, item);
                     }
                 }
             }
-            removeMarker(grave);
-            unregister(grave);
-            storage.delete(graveId);
+            removeGrave(grave);
         });
     }
 
-    public void removeMarker(GraveData grave) {
-        ArmorStand armorStand = findMarker(grave.graveId());
-        if (armorStand != null) {
-            armorStand.remove();
-        }
-    }
-
-    public void closeGraveIfEmpty(GraveData grave) {
-        boolean empty = true;
-        for (ItemStack item : grave.items()) {
-            if (item != null && item.getType() != Material.AIR) {
-                empty = false;
-                break;
+    public void removeGrave(GraveData grave) {
+        Location location = locationOf(grave);
+        if (location != null) {
+            Block block = location.getBlock();
+            if (isGraveChest(block)) {
+                block.setType(Material.AIR, false);
             }
         }
-        if (empty) {
-            removeMarker(grave);
-            unregister(grave);
-            storage.delete(grave.graveId());
-        } else {
-            storage.save(grave);
+        removeLabelOnly(grave);
+    }
+
+    public void removeLabelOnly(GraveData grave) {
+        ArmorStand label = findLabel(grave.graveId());
+        if (label != null) {
+            label.remove();
         }
+        unregister(grave);
+        storage.delete(grave.graveId());
     }
 
-    public boolean isGraveMarker(Entity entity) {
-        return entity.getPersistentDataContainer().has(graveIdKey, PersistentDataType.STRING);
+    public boolean isGraveChest(Block block) {
+        if (block.getState() instanceof Chest chest) {
+            return chest.getPersistentDataContainer().has(graveIdKey, PersistentDataType.STRING);
+        }
+        return false;
     }
 
-    public UUID markerGraveId(Entity entity) {
-        String value = entity.getPersistentDataContainer().get(graveIdKey, PersistentDataType.STRING);
-        return value != null ? UUID.fromString(value) : null;
+    public UUID chestGraveId(Block block) {
+        if (block.getState() instanceof Chest chest) {
+            String value = chest.getPersistentDataContainer().get(graveIdKey, PersistentDataType.STRING);
+            return value != null ? UUID.fromString(value) : null;
+        }
+        return null;
     }
 
     public void rehydrateChunk(org.bukkit.Chunk chunk) {
@@ -228,8 +249,11 @@ public final class GraveManager {
             }
             int chunkX = ((int) Math.floor(grave.x())) >> 4;
             int chunkZ = ((int) Math.floor(grave.z())) >> 4;
-            if (chunkX == chunk.getX() && chunkZ == chunk.getZ() && findMarker(grave.graveId()) == null) {
-                spawnMarker(grave);
+            if (chunkX == chunk.getX() && chunkZ == chunk.getZ() && findLabel(grave.graveId()) == null) {
+                Location location = locationOf(grave);
+                if (location != null) {
+                    spawnLabel(grave, location.getWorld(), location);
+                }
             }
         }
     }
