@@ -1,8 +1,5 @@
 package nino.gravekeeper.model;
 
-import org.bukkit.inventory.ItemStack;
-
-import java.util.List;
 import java.util.UUID;
 
 public final class GraveData {
@@ -14,14 +11,13 @@ public final class GraveData {
     private final double x;
     private final double y;
     private final double z;
-    private final List<ItemStack> items;
     private final int experienceLevel;
     private final long createdAtMillis;
     private long expiresAtMillis;
 
     public GraveData(UUID graveId, UUID ownerId, String ownerName, String worldName,
-                      double x, double y, double z, List<ItemStack> items,
-                      int experienceLevel, long createdAtMillis, long expiresAtMillis) {
+                      double x, double y, double z, int experienceLevel,
+                      long createdAtMillis, long expiresAtMillis) {
         this.graveId = graveId;
         this.ownerId = ownerId;
         this.ownerName = ownerName;
@@ -29,7 +25,6 @@ public final class GraveData {
         this.x = x;
         this.y = y;
         this.z = z;
-        this.items = items;
         this.experienceLevel = experienceLevel;
         this.createdAtMillis = createdAtMillis;
         this.expiresAtMillis = expiresAtMillis;
@@ -61,10 +56,6 @@ public final class GraveData {
 
     public double z() {
         return z;
-    }
-
-    public List<ItemStack> items() {
-        return items;
     }
 
     public int experienceLevel() {
