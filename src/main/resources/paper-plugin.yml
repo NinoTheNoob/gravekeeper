@@ -1,0 +1,6 @@
+name: Gravekeeper
+version: '1.0'
+main: nino.gravekeeper.Gravekeeper
+api-version: '1.21'
+author: nino
+folia-supported: true
