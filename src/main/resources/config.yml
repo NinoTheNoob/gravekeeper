@@ -1,0 +1,14 @@
+grave-lifetime-seconds: 300
+on-expire: DROP
+marker-material: PLAYER_HEAD
+protect-from-others: true
+allow-admin-access: true
+messages:
+  prefix: "&8[&2Gravekeeper&8] "
+  grave-created: "&aYour grave has been created! Use /grave to find it."
+  grave-expired: "&cYour grave at %location% has expired."
+  no-permission: "&cThis is not your grave."
+  reload: "&aConfiguration reloaded successfully."
+  no-graves: "&7You currently have no open graves."
+  invalid-index: "&cInvalid grave index."
+  teleported: "&aYou have been teleported to your grave."
