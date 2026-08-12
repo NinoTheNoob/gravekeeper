@@ -112,7 +112,7 @@ public final class GraveManager {
             ArmorStand armorStand = (ArmorStand) world.spawnEntity(location, EntityType.ARMOR_STAND);
             armorStand.setInvisible(true);
             armorStand.setGravity(false);
-            armorStand.setMarker(true);
+            armorStand.setBasePlate(false);
             armorStand.setSmall(true);
             armorStand.setCustomNameVisible(true);
             armorStand.customName(net.kyori.adventure.text.Component.text(grave.ownerName() + "'s Grave"));
