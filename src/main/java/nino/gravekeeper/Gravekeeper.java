@@ -5,7 +5,7 @@ import nino.gravekeeper.command.GraveCommand;
 import nino.gravekeeper.command.GravekeeperAdminCommand;
 import nino.gravekeeper.listener.ChunkRehydrateListener;
 import nino.gravekeeper.listener.DeathListener;
-import nino.gravekeeper.listener.GraveInteractListener;
+import nino.gravekeeper.listener.GraveAccessListener;
 import nino.gravekeeper.manager.GraveManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -21,7 +21,7 @@ public final class Gravekeeper extends JavaPlugin {
         graveManager.loadAll();
 
         getServer().getPluginManager().registerEvents(new DeathListener(graveManager), this);
-        getServer().getPluginManager().registerEvents(new GraveInteractListener(this, graveManager), this);
+        getServer().getPluginManager().registerEvents(new GraveAccessListener(this, graveManager), this);
         getServer().getPluginManager().registerEvents(new ChunkRehydrateListener(graveManager), this);
 
         GraveCommand graveCommand = new GraveCommand(this, graveManager);
