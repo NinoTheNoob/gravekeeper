@@ -1,6 +1,5 @@
 grave-lifetime-seconds: 300
 on-expire: DROP
-marker-material: PLAYER_HEAD
 protect-from-others: true
 allow-admin-access: true
 messages:
