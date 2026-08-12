@@ -2,7 +2,6 @@ package nino.gravekeeper.manager;
 
 import nino.gravekeeper.model.GraveData;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -36,7 +35,6 @@ public final class GraveStorage {
         config.set("x", grave.x());
         config.set("y", grave.y());
         config.set("z", grave.z());
-        config.set("items", grave.items());
         config.set("experienceLevel", grave.experienceLevel());
         config.set("createdAtMillis", grave.createdAtMillis());
         config.set("expiresAtMillis", grave.expiresAtMillis());
@@ -69,7 +67,6 @@ public final class GraveStorage {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     private GraveData load(File file) {
         try {
             YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
@@ -80,13 +77,11 @@ public final class GraveStorage {
             double x = config.getDouble("x");
             double y = config.getDouble("y");
             double z = config.getDouble("z");
-            List<ItemStack> items = (List<ItemStack>) config.getList("items");
             int experienceLevel = config.getInt("experienceLevel");
             long createdAtMillis = config.getLong("createdAtMillis");
             long expiresAtMillis = config.getLong("expiresAtMillis");
             return new GraveData(graveId, ownerId, ownerName, worldName, x, y, z,
-                    items != null ? items : new ArrayList<>(), experienceLevel,
-                    createdAtMillis, expiresAtMillis);
+                    experienceLevel, createdAtMillis, expiresAtMillis);
         } catch (Exception exception) {
             plugin.getLogger().warning("Failed to load grave file " + file.getName() + ": " + exception.getMessage());
             return null;
